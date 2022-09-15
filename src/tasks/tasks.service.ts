@@ -14,31 +14,26 @@ export class TasksService {
         private tasksRepository: Repository<Task>,
     ) { }
 
-    // getAllTasks(): Task[] {
-    //     return this.tasks;
-    // };
+    async getTasks(filterDto: GetTaskFilterDto): Promise<Task[]> {
+        const { status, search } = filterDto;
+        const query = this.tasksRepository.createQueryBuilder('task');
 
-    // getTasksWithFilters(filterDto: GetTaskFilterDto): Task[] {
-    //     const { status, search } = filterDto;
+        if (status) {
+            query.andWhere('task.status = :status', { status });
+        }
 
-    //     let tasks = this.getAllTasks();
+        if (search) {
+            query.andWhere(
+                'LOWER(task.title) LIKE LOWER(:search) OR LOWER(task.description) LIKE LOWER(:search)',
+                { search: `%${search}%` }
+            )
+        }
 
-    //     if (status) {
-    //         tasks = tasks.filter(task => task.status === status);
-    //     };
 
-    //     if (search) {
-    //         tasks = tasks.filter(task => {
-    //             if (task.title.includes(search) || task.description.includes(search)) {
-    //                 return true;
-    //             };
+        const tasks = await query.getMany();
+        return tasks;
+    }
 
-    //             return false;
-    //         })
-    //     };
-
-    //     return tasks;
-    // };
     async getTaskById(id: string): Promise<Task> {
         const found = await this.tasksRepository.findOne({
             where: {
@@ -53,31 +48,35 @@ export class TasksService {
         return found;
     }
 
-    // createTask(createTaskDto: CreateTaskDto): Task {
+    async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
+        const { title, description } = createTaskDto;
 
-    //     const { title, description } = createTaskDto;
+        const task = this.tasksRepository.create({
+            title,
+            description,
+            status: TaskStatus.OPEN
+        });
 
-    //     const task: Task = {
-    //         id: uuid(),
-    //         title,
-    //         description,
-    //         status: TaskStatus.OPEN
-    //     };
+        await this.tasksRepository.save(task);
+        return task;
 
-    //     this.tasks.push(task);
+    };
 
-    //     return task;
-    // };
+    async deleteTask(id: string): Promise<void> {
+        const deleteResult = await this.tasksRepository.delete(id);
 
-    // deleteTask(id: string) {
-    //     const found = this.getTaskById(id);
-    //     this.tasks = this.tasks.filter(task => task.id !== found.id);
-    //     console.log(`Task ID : ${id} deleted!`)
-    // };
+        if (deleteResult.affected === 1) {
+            throw new NotFoundException(`Task with ID : '${id}' not found`);
+        };
 
-    // updateTask(id: string, status: TaskStatus) {
-    //     const task = this.getTaskById(id);
-    //     task.status = status;
-    //     return task;
-    // }
+    };
+
+    async updateTask(id: string, status: TaskStatus): Promise<Task> {
+        const task = await this.getTaskById(id);
+
+        task.status = status;
+        await this.tasksRepository.save(task);
+
+        return task;
+    }
 }
