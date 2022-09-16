@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { TaskStatus } from './task-status.enum';
 import { Task } from './task.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -9,6 +10,7 @@ import { User } from 'src/auth/user.entity';
 
 @Injectable()
 export class TasksService {
+    private logger = new Logger('TasksService', { timestamp: true }); //true > timeStamps enabled
     constructor(
         @InjectRepository(Task)
         // Custom repository ex @EntityRepository
@@ -32,9 +34,13 @@ export class TasksService {
             )
         }
 
-
-        const tasks = await query.getMany();
-        return tasks;
+        try {
+            const tasks = await query.getMany();
+            return tasks;
+        } catch (error) {
+            this.logger.error(`Failed to get tasks   for user "${user.username}". Filters: ${JSON.stringify(filterDto)}`, error.stack)
+            throw new InternalServerErrorException();
+        }
     }
 
     async getTaskById(id: string, user: User): Promise<Task> {
